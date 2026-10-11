@@ -1,0 +1,131 @@
+name: QEMU SPICE Remote Console
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qemu-spice:
+    runs-on: windows-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Install QEMU and Check Acceleration
+        shell: pwsh
+        run: |
+          choco install qemu -y --no-progress
+
+          $qemu = "C:\Program Files\qemu\qemu-system-x86_64.exe"
+
+          if (-not (Test-Path $qemu)) {
+            throw "QEMU executable not found."
+          }
+
+          "QEMU_EXE=$qemu" | Out-File $env:GITHUB_ENV -Append
+
+          Write-Host "=== QEMU Version ==="
+          & $qemu --version
+
+          Write-Host "=== Available Accelerators ==="
+          & $qemu -accel help
+
+          Write-Host "=== CPU Information ==="
+          Get-CimInstance Win32_Processor |
+            Select-Object Name, NumberOfCores, NumberOfLogicalProcessors
+
+          Write-Host "=== Memory Information ==="
+          Get-CimInstance Win32_ComputerSystem |
+            Select-Object @{Name="RAM_GB";Expression={
+              [math]::Round($_.TotalPhysicalMemory / 1GB, 2)
+            }}
+
+          Write-Host "=== Windows Hypervisor Platform ==="
+          dism.exe /Online /Get-FeatureInfo /FeatureName:HypervisorPlatform
+
+      - name: Check SPICE Support
+        shell: pwsh
+        run: |
+          $output = & $env:QEMU_EXE -spice help 2>&1 |
+            Out-String
+
+          Write-Host $output
+
+          if ($output -match "invalid option|unknown option") {
+            Write-Warning `
+              "SPICE support may be unavailable in this QEMU build."
+          }
+
+      - name: Install Tailscale
+        shell: pwsh
+        run: |
+          $installer = "$env:TEMP\tailscale.msi"
+
+          Invoke-WebRequest `
+            "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi" `
+            -OutFile $installer
+
+          Start-Process msiexec.exe `
+            -ArgumentList "/i `"$installer`" /quiet /norestart" `
+            -Wait
+
+          Remove-Item $installer -Force
+
+      - name: Connect Tailscale
+        shell: pwsh
+        env:
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          if (-not $env:TS_AUTHKEY) {
+            throw "Add TAILSCALE_AUTH_KEY to repository Actions secrets."
+          }
+
+          $ts = "$env:ProgramFiles\Tailscale\tailscale.exe"
+
+          & $ts up `
+            "--auth-key=$env:TS_AUTHKEY" `
+            "--hostname=qemu-$env:GITHUB_RUN_ID"
+
+          $ip = $null
+
+          for ($i = 0; $i -lt 20 -and -not $ip; $i++) {
+            Start-Sleep -Seconds 3
+            $ip = (& $ts ip -4 2>$null |
+              Select-Object -First 1).Trim()
+          }
+
+          if (-not $ip) {
+            throw "Tailscale did not receive an IPv4 address."
+          }
+
+          "TAILSCALE_IP=$ip" |
+            Out-File $env:GITHUB_ENV -Append
+
+          Write-Host "Tailscale IP: $ip"
+
+      - name: Prepare VM Storage
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP\qemu-vm"
+          New-Item -ItemType Directory -Path $dir -Force |
+            Out-Null
+
+          & $env:QEMU_EXE `
+            -drive "file=$dir\windows10.qcow2,format=qcow2,if=virtio" `
+            -display none `
+            -S `
+            -machine help 2>&1 |
+            Out-String |
+            Write-Host
+
+          Write-Host "VM storage directory: $dir"
+
+      - name: Report Next Setup Requirements
+        shell: pwsh
+        run: |
+          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
+          Write-Host "QEMU: $env:QEMU_EXE"
+          Write-Host "RDP is not enabled by this workflow."
+          Write-Host "Next: configure a Windows 10 ISO, VM disk,"
+          Write-Host "and a SPICE-enabled QEMU build."
