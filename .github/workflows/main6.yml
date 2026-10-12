@@ -96,43 +96,26 @@ jobs:
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-      - name: Download Windows ISO
+            - name: Download Windows ISO
         shell: pwsh
         env:
           ISO_URL: "https://archive.org/download/Win10_IntegralEdition_2026.4.15/Windows%2010%2022H2.7184%2016in1%20en-US%20x64%20-%20Integral%20Edition%202026.4.15%20-%20CRC32%3Dabbf3579.iso"
         run: |
-          $ErrorActionPreference = "Stop"
           $iso = "$env:RUNNER_TEMP\windows.iso"
 
-          if ([string]::IsNullOrWhiteSpace($env:ISO_URL)) {
-            throw ""ISO URL is empty. Enter a direct ISO download link"
-          }
-
-          Write-Host "Downloading Windows ISO..."
-
-          curl.exe -fSL --retry 3 --retry-delay 5 `
-            "$env:ISO_URL" `
-            -o "$iso"
+          curl.exe -fSL --retry 3 "$env:ISO_URL" -o "$iso"
 
           if ($LASTEXITCODE -ne 0) {
-            throw "ISO download failed. curl exit code: $LASTEXITCODE"
+            throw "ISO download failed."
           }
 
           if (!(Test-Path $iso)) {
-            throw "Downloaded ISO file was not created."
+            throw "ISO file was not downloaded."
           }
-
-          $file = Get-Item $iso
-
-          if ($file.Length -lt 100MB) {
-            throw "Downloaded file is too small. Check that the URL points directly to an ISO file."
-          }
-
-          Write-Host "ISO downloaded successfully."
-          Write-Host "File size: $([math]::Round($file.Length / 1GB, 2)) GB"
 
           "WINDOWS_ISO=$iso" |
             Out-File $env:GITHUB_ENV -Append
+        
       - name: Start QEMU with SPICE
         shell: pwsh
         run: |
