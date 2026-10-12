@@ -2,10 +2,11 @@ name: QEMU SPICE Remote Console
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: read
-
+    inputs:
+      iso_url:
+        description: "Direct download URL for the Windows ISO"
+        required: true
+        type: string
 jobs:
   qemu-spice:
     runs-on: windows-latest
