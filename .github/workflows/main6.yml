@@ -96,7 +96,7 @@ jobs:
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-            - name: Download Windows ISO
+      - name: Download Windows ISO
         shell: pwsh
         env:
           ISO_URL: "https://archive.org/download/Win10_IntegralEdition_2026.4.15/Windows%2010%2022H2.7184%2016in1%20en-US%20x64%20-%20Integral%20Edition%202026.4.15%20-%20CRC32%3Dabbf3579.iso"
