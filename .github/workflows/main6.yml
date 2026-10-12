@@ -48,15 +48,22 @@ jobs:
       - name: Check SPICE Support
         shell: pwsh
         run: |
+          Write-Host "Checking QEMU SPICE support..."
+
           $output = & $env:QEMU_EXE -spice help 2>&1 |
             Out-String
 
           Write-Host $output
 
-          if ($output -match "invalid option|unknown option") {
-            Write-Warning `
-              "SPICE support may be unavailable in this QEMU build."
+          if ($output -match "spice options:") {
+            Write-Host "QEMU recognizes the SPICE options."
+          } else {
+            Write-Warning "Could not confirm SPICE support."
           }
+
+          # این دستور صرفاً بررسی است؛ کد خروج 1 آن
+          # به‌تنهایی به معنی نبود پشتیبانی SPICE نیست.
+          exit 0
 
       - name: Install Tailscale
         shell: pwsh
