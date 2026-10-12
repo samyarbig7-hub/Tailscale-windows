@@ -114,6 +114,7 @@ jobs:
             -machine help 2>&1 |
             Out-String |
             Write-Host
+            -spice addr=127.0.0.1,port=5930,disable-ticketing=off
 
           Write-Host "VM storage directory: $dir"
 
