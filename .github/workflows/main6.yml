@@ -99,13 +99,13 @@ jobs:
       - name: Download Windows ISO
         shell: pwsh
         env:
-          ISO_URL: ${{ inputs.iso_url }}
+          ISO_URL: "https://archive.org/download/Win10_IntegralEdition_2026.4.15/Windows%2010%2022H2.7184%2016in1%20en-US%20x64%20-%20Integral%20Edition%202026.4.15%20-%20CRC32%3Dabbf3579.iso"
         run: |
           $ErrorActionPreference = "Stop"
           $iso = "$env:RUNNER_TEMP\windows.iso"
 
           if ([string]::IsNullOrWhiteSpace($env:ISO_URL)) {
-            throw "https://archive.org/download/Win10_IntegralEdition_2026.4.15/Windows%2010%2022H2.7184%2016in1%20en-US%20x64%20-%20Integral%20Edition%202026.4.15%20-%20CRC32%3Dabbf3579.iso"
+            throw ""ISO URL is empty. Enter a direct ISO download link"
           }
 
           Write-Host "Downloading Windows ISO..."
