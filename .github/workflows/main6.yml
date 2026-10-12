@@ -80,37 +80,25 @@ jobs:
 
           Remove-Item $installer -Force
 
-      - name: Connect Tailscale
-        shell: pwsh
-        env:
-          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+      - name: Establish Tailscale Connection
         run: |
-          if (-not $env:TS_AUTHKEY) {
-            throw "Add TAILSCALE_AUTH_KEY to repository Actions secrets."
+          # Bring up Tailscale with the provided auth key and set a unique hostname
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
+          
+          # Wait for Tailscale to assign an IP
+          $tsIP = $null
+          $retries = 0
+          while (-not $tsIP -and $retries -lt 10) {
+              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              Start-Sleep -Seconds 5
+              $retries++
           }
-
-          $ts = "$env:ProgramFiles\Tailscale\tailscale.exe"
-
-          & $ts up `
-            "--auth-key=$env:TS_AUTHKEY" `
-            "--hostname=qemu-$env:GITHUB_RUN_ID"
-
-          $ip = $null
-
-          for ($i = 0; $i -lt 20 -and -not $ip; $i++) {
-            Start-Sleep -Seconds 3
-            $ip = (& $ts ip -4 2>$null |
-              Select-Object -First 1).Trim()
+          
+          if (-not $tsIP) {
+              Write-Error "Tailscale IP not assigned. Exiting."
+              exit 1
           }
-
-          if (-not $ip) {
-            throw "Tailscale did not receive an IPv4 address."
-          }
-
-          "TAILSCALE_IP=$ip" |
-            Out-File $env:GITHUB_ENV -Append
-
-          Write-Host "Tailscale IP: $ip"
+          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
       - name: Prepare VM Storage
         shell: pwsh
