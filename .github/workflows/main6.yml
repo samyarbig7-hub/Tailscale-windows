@@ -100,23 +100,28 @@ jobs:
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-      - name: Prepare VM Storage
+      - name: Start QEMU with SPICE
         shell: pwsh
         run: |
-          $dir = "$env:RUNNER_TEMP\qemu-vm"
-          New-Item -ItemType Directory -Path $dir -Force |
-            Out-Null
+          $qemu = $env:QEMU_EXE
+          $iso = "$env:RUNNER_TEMP\windows.iso"
+          $disk = "$env:RUNNER_TEMP\windows10.qcow2"
 
-          & $env:QEMU_EXE -spice "addr=127.0.0.1,port=5930,disable-ticketing=on"`
-            -drive "file=$dir\windows10.qcow2,format=qcow2,if=virtio" `
+          if (!(Test-Path $iso)) {
+            throw "Windows ISO not found: $iso"
+          }
+
+          & $qemu `
+            -machine q35 `
+            -accel tcg,thread=multi `
+            -cpu max `
+            -smp 4 `
+            -m 4G `
+            -drive "file=$disk,format=qcow2,if=ide" `
+            -cdrom "$iso" `
+            -boot order=d `
             -display none `
-            -S `
-            -machine help 2>&1 |
-            Out-String |
-            Write-Host
-            
-
-          Write-Host "VM storage directory: $dir"
+            -spice "addr=127.0.0.1,port=5930,disable-ticketing=on"
 
       - name: Report Next Setup Requirements
         shell: pwsh
