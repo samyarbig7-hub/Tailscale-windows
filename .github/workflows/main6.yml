@@ -125,3 +125,11 @@ jobs:
           Write-Host "RDP is not enabled by this workflow."
           Write-Host "Next: configure a Windows 10 ISO, VM disk,"
           Write-Host "and a SPICE-enabled QEMU build."
+          
+      - name:
+        run: |
+         # Keep runner active indefinitely (or until manually cancelled)
+          while ($true) {
+              Write-Host "[$(Get-Date)] QEMU Active - Use Ctrl+C in workflow to terminate"
+              Start-Sleep -Seconds 300
+          }
