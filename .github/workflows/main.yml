@@ -107,7 +107,7 @@ jobs:
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
           # Enable unattended mode
           & "$env:ProgramFiles\Tailscale\tailscale.exe" set --unattended=true
-          wrtie-Host "Successfully Enabled unattended access"
+          
 
       - name: Verify RDP Accessibility
         shell: pwsh
