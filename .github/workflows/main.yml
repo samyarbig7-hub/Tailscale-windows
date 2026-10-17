@@ -78,67 +78,36 @@ jobs:
           Write-Host "RDP account configured."
 
       - name: Install Tailscale
-        shell: pwsh
         run: |
-          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi"
+          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           $installerPath = "$env:TEMP\tailscale.msi"
-
+          
           Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
-
-          $process = Start-Process msiexec.exe `
-            -ArgumentList "/i `"$installerPath`" /quiet /norestart" `
-            -Wait -PassThru
-
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
           Remove-Item $installerPath -Force
 
-          if ($process.ExitCode -notin @(0, 3010)) {
-            throw "Tailscale installation failed: $($process.ExitCode)"
-          }
-
-      - name: Connect Tailscale
-        shell: pwsh
-        env:
-          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+      - name: Establish Tailscale Connection
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:TS_AUTHKEY)) {
-            throw "Missing TAILSCALE_AUTH_KEY repository secret."
-          }
-
-          $ts = "$env:ProgramFiles\Tailscale\tailscale.exe"
-
-          & $ts up "--auth-key=$env:TS_AUTHKEY" `
-            "--hostname=gh-runner-$env:GITHUB_RUN_ID"
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "Tailscale connection failed."
-          }
-
-          # Enable unattended operation.
-          & $ts set --unattended=true
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "Could not enable Tailscale unattended mode."
-          }
-
+          # Bring up Tailscale with the provided auth key and set a unique hostname
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
+          
+          # Wait for Tailscale to assign an IP
           $tsIP = $null
-
-          for ($i = 0; $i -lt 20 -and -not $tsIP; $i++) {
-            Start-Sleep -Seconds 3
-            $result = & $ts ip -4 2>$null
-            if ($LASTEXITCODE -eq 0 -and $result) {
-              $tsIP = ($result | Select-Object -First 1).Trim()
-            }
+          $retries = 0
+          while (-not $tsIP -and $retries -lt 10) {
+              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              Start-Sleep -Seconds 5
+              $retries++
           }
-
+          
           if (-not $tsIP) {
-            throw "Tailscale IP was not assigned."
+              Write-Error "Tailscale IP not assigned. Exiting."
+              exit 1
           }
-
-          "TAILSCALE_IP=$tsIP" |
-            Out-File $env:GITHUB_ENV -Append
-
-          Write-Host "Tailscale IP: $tsIP"
-          Write-Host "Unattended mode enabled."
+          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
+          # Enable unattended mode
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" set --unattended=true
+          wrtie-Host "Successfully Enabled unattended access"
 
       - name: Verify RDP Accessibility
         shell: pwsh
