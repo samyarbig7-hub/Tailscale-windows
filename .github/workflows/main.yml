@@ -23,14 +23,6 @@ jobs:
             throw "Failed to query HypervisorPlatform."
           }
 
-          Write-Host "Requesting Windows restart..."
-
-          Start-Process -FilePath "$env:WINDIR\System32\shutdown.exe" `
-          -ArgumentList "/r", "/t", "0", "/f" `
-          -WindowStyle Hidden
-
-          Write-Host "Restart command submitted."
-
       - name: Configure Core RDP Settings
         shell: pwsh
         run: |
